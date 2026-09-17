@@ -1,0 +1,286 @@
+/* ==========================================================================
+   tokens.css
+   --------------------------------------------------------------------------
+   The single source of truth for every design decision in the system.
+
+   RULE: No value in components.css may be a raw number or hex code.
+   Every dimension, colour, and type setting is consumed from here.
+   If a value is not a token, it is not part of the system.
+
+   STRUCTURE (two tiers):
+     1. Primitive tokens  — the raw, context-free palette of available values
+                            (e.g. --color-gray-600, --space-3).
+     2. Semantic tokens   — named by ROLE, not appearance
+                            (e.g. --color-text-secondary, --size-control).
+                            Components consume semantic tokens only.
+
+   Why two tiers: a component asks "what is the border colour of an
+   interactive control?", never "what is gray-600?". Re-theming or
+   correcting a contrast failure means editing one semantic mapping,
+   not hunting through component rules.
+   ========================================================================== */
+
+
+/* --------------------------------------------------------------------------
+   CASCADE LAYER ORDER
+   Declared here because tokens.css is the first stylesheet loaded.
+   Layers resolve in declaration order, lowest priority first:
+     tokens      → variables only
+     base        → element defaults (reset, body type)
+     components  → .c-* component classes
+     layout      → .l-* page-composition classes
+   Specificity inside a later layer never has to "fight" an earlier layer,
+   which removes the need for !important or selector escalation.
+   -------------------------------------------------------------------------- */
+@layer tokens, base, components, layout;
+
+
+@layer tokens {
+  :root {
+
+    /* ======================================================================
+       1. SPACING — STRICT 8-POINT GRID
+       ----------------------------------------------------------------------
+       One base unit. Every step is an integer multiple of it.
+       Expressed in rem so the grid scales with the user's browser font-size
+       preference (WCAG 1.4.4 Resize Text). At the default 16px root:
+       1 unit = 0.5rem = 8px.
+
+       Naming is by MULTIPLIER, not by t-shirt size: --space-3 is always
+       3 × 8 = 24px. A designer reading "24" in a design file and a developer
+       reading --space-3 are referencing the same number with no translation.
+
+       Steps are deliberately non-contiguous above 6. Gaps in the scale force
+       a decision between two meaningfully different distances rather than
+       allowing near-duplicate values (e.g. 56 vs 64) to creep in.
+       ====================================================================== */
+    --space-unit: 0.5rem;                           /*  8px — the atom          */
+
+    --space-0:  0;                                  /*  0px                     */
+    --space-1:  calc(var(--space-unit) * 1);        /*  8px — intra-component   */
+    --space-2:  calc(var(--space-unit) * 2);        /* 16px — inner padding     */
+    --space-3:  calc(var(--space-unit) * 3);        /* 24px — control padding   */
+    --space-4:  calc(var(--space-unit) * 4);        /* 32px — container padding */
+    --space-5:  calc(var(--space-unit) * 5);        /* 40px                     */
+    --space-6:  calc(var(--space-unit) * 6);        /* 48px — related groups    */
+    --space-8:  calc(var(--space-unit) * 8);        /* 64px — section gap       */
+    --space-10: calc(var(--space-unit) * 10);       /* 80px                     */
+    --space-12: calc(var(--space-unit) * 12);       /* 96px — page-level gap    */
+
+
+    /* ======================================================================
+       2. SIZING — DIMENSIONS DERIVED FROM THE GRID
+       ----------------------------------------------------------------------
+       Fixed element dimensions are also grid multiples, so a control's
+       outer box always lands on the 8-point grid regardless of its border.
+       (All components use box-sizing: border-box; borders are absorbed
+       inside these dimensions and never add to them.)
+       ====================================================================== */
+
+    /* 48px: every interactive control shares this block-size.
+       Exceeds WCAG 2.5.8 Target Size (Minimum, 24px) and meets the
+       2.5.5 Enhanced target (44px). Buttons and inputs placed side by side
+       align on the same baseline because they share one token. */
+    --size-control: var(--space-6);
+
+    /* Maximum inline-size of the page's content column: 90 units = 720px. */
+    --size-container: calc(var(--space-unit) * 90);
+
+    /* Maximum line length for running text. Measured in characters, not
+       grid units, because readability is a function of glyph count.
+       This is the one intentional non-grid dimension in the system. */
+    --size-measure: 65ch;
+
+
+    /* ======================================================================
+       3. STROKES & RADII
+       ----------------------------------------------------------------------
+       Strokes are NOT spacing. They are 1px/2px hairlines that sit inside
+       border-box dimensions, so they never break the 8-point rhythm.
+       Kept in px intentionally: a hairline should remain a hairline at any
+       zoom level, and sub-pixel rem borders render inconsistently.
+       ====================================================================== */
+    --border-width-thin:  1px;   /* resting boundaries                          */
+    --border-width-thick: 2px;   /* emphasis: primary action, error state       */
+
+    --radius-none: 0;            /* Rectilinear system: no rounding.            */
+
+    /* Underline offset in em so it tracks the label's font size. */
+    --underline-offset: 0.25em;
+
+
+    /* ======================================================================
+       4. FOCUS INDICATOR
+       ----------------------------------------------------------------------
+       Defined once, applied identically to every focusable component.
+       WCAG 2.4.7 (Focus Visible) and 2.4.13 (Focus Appearance):
+       - 2px solid ring (≥ 2 CSS px thick perimeter)
+       - Offset from the element so it never overlaps the element's own
+         border, keeping the indicator distinguishable from resting state.
+       - A white halo fills the offset gap, so the black ring retains 3:1+
+         contrast even when a component is placed on a dark surface.
+       ====================================================================== */
+    --focus-ring-width:  2px;
+    --focus-ring-offset: 2px;
+
+
+    /* ======================================================================
+       5. TYPOGRAPHY — FONT FAMILIES
+       ----------------------------------------------------------------------
+       Three families, each assigned a single structural job.
+       Each stack degrades to metrically similar system fonts so layout
+       shift is minimal if the web font fails or is still loading.
+       ====================================================================== */
+
+    /* Primitive stacks */
+    --font-family-archivo:
+      "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+      Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    --font-family-newsreader:
+      "Newsreader", ui-serif, Georgia, Cambria, "Times New Roman",
+      Times, serif;
+
+    --font-family-plex-mono:
+      "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
+      "Liberation Mono", monospace;
+
+    /* Semantic roles — components reference these, never the stacks above.
+       Swapping a typeface is a one-line change to a role mapping. */
+    --font-heading: var(--font-family-archivo);     /* structure & hierarchy  */
+    --font-ui:      var(--font-family-archivo);     /* controls & labels      */
+    --font-body:    var(--font-family-newsreader);  /* long-form reading      */
+    --font-meta:    var(--font-family-plex-mono);   /* metadata, codes, specs */
+
+
+    /* ======================================================================
+       6. TYPOGRAPHY — FLUID TYPE SCALE
+       ----------------------------------------------------------------------
+       Each step interpolates linearly between two modular scales:
+         at 320px viewport  (20rem): base 1rem,     ratio 1.200 (minor third)
+         at 1280px viewport (80rem): base 1.125rem, ratio 1.250 (major third)
+
+       Formula per step:  clamp(MIN, INTERCEPT + SLOPE·vw, MAX)
+         SLOPE     = (MAX − MIN) / (80 − 20)       [in rem per rem of viewport]
+         INTERCEPT = MIN − SLOPE × 20
+
+       The preferred value always contains a rem term. A pure-vw font size
+       ignores browser zoom and user font preferences (a WCAG 1.4.4 failure);
+       the rem intercept preserves it.
+
+       The ratio widens on larger screens: hierarchy needs more contrast
+       between steps when more content is visible at once, and less on small
+       screens where large headings consume scarce vertical space.
+
+       Named by step relative to body text (0), so the scale is extensible
+       in both directions without renaming existing tokens.
+       ====================================================================== */
+    --font-size--1: clamp(0.8333rem, 0.8111rem + 0.1111vw, 0.9rem);    /* 13.3 → 14.4px  meta, captions */
+    --font-size-0:  clamp(1rem,      0.9583rem + 0.2083vw, 1.125rem);  /* 16.0 → 18.0px  body, controls */
+    --font-size-1:  clamp(1.2rem,    1.1313rem + 0.3438vw, 1.4063rem); /* 19.2 → 22.5px  lede, h4       */
+    --font-size-2:  clamp(1.44rem,   1.3341rem + 0.5297vw, 1.7578rem); /* 23.0 → 28.1px  h3, card title */
+    --font-size-3:  clamp(1.728rem,  1.5716rem + 0.7822vw, 2.1973rem); /* 27.6 → 35.2px  h2             */
+    --font-size-4:  clamp(2.0736rem, 1.8493rem + 1.1217vw, 2.7466rem); /* 33.2 → 43.9px  h1             */
+
+    /* Line-height: unitless so it scales with each step's computed size.
+       Tighter for large display text (fewer, longer lines), looser for body
+       text (WCAG 1.4.12 recommends ≥ 1.5 for paragraphs). */
+    --line-height-tight: 1.15;
+    --line-height-snug:  1.3;
+    --line-height-body:  1.5;
+
+    --font-weight-regular:  400;
+    --font-weight-medium:   500;
+    --font-weight-semibold: 600;
+    --font-weight-bold:     700;
+
+    /* Positive tracking for uppercase monospace metadata; slight negative
+       tracking for large headings, which read as loose at display sizes. */
+    --letter-spacing-meta:    0.06em;
+    --letter-spacing-heading: -0.01em;
+
+
+    /* ======================================================================
+       7. COLOUR — PRIMITIVE PALETTE (MONOCHROME)
+       ----------------------------------------------------------------------
+       Neutral grays only. Contrast ratios below are measured against
+       --color-white (#FFFFFF) using the WCAG 2.x relative-luminance formula.
+
+       AA thresholds: 4.5:1 normal text · 3:1 large text · 3:1 UI boundaries
+       AAA threshold: 7:1 normal text
+
+       Steps with no ratio listed (100–300) are NOT permitted for text or
+       for any boundary a user must perceive to operate a control.
+       ====================================================================== */
+    --color-white:    #ffffff;
+    --color-gray-100: #f2f2f2;  /*  1.12:1  — surface tint only                */
+    --color-gray-200: #e0e0e0;  /*  1.32:1  — decorative dividers only         */
+    --color-gray-300: #bdbdbd;  /*  1.88:1  — decorative dividers only         */
+    --color-gray-600: #616161;  /*  6.19:1  — AA text, AA UI boundary          */
+    --color-gray-700: #4a4a4a;  /*  8.86:1  — AAA text                         */
+    --color-gray-800: #2e2e2e;  /* 13.58:1  — AAA text                         */
+    --color-gray-900: #1a1a1a;  /* 17.40:1  — AAA text                         */
+    --color-black:    #000000;  /* 21.00:1  — maximum                          */
+
+
+    /* ======================================================================
+       8. COLOUR — SEMANTIC ROLES
+       ----------------------------------------------------------------------
+       Grouped by what the colour DOES. Components consume only these.
+       ====================================================================== */
+
+    /* Surfaces: the planes content sits on. */
+    --color-surface-page:     var(--color-white);
+    --color-surface-raised:   var(--color-white);
+    --color-surface-disabled: var(--color-gray-100);
+
+    /* Text: ordered by hierarchy. All pass AA on every surface above. */
+    --color-text-primary:     var(--color-black);     /* 21.00:1               */
+    --color-text-secondary:   var(--color-gray-700);  /*  8.86:1               */
+    --color-text-placeholder: var(--color-gray-600);  /*  6.19:1 — lighter than
+                                 entered text to signal "example", but still
+                                 AA-compliant because placeholders are read.  */
+    --color-text-disabled:    var(--color-gray-600);  /*  5.53:1 on gray-100.
+                                 WCAG exempts disabled controls from contrast
+                                 requirements; this system meets AA anyway.   */
+    --color-text-inverse:     var(--color-white);
+
+    /* Borders: split by whether the boundary carries meaning.
+       "subtle" is decorative grouping only and must never be the sole
+       indicator of an interactive element's extent (WCAG 1.4.11). */
+    --color-border-subtle:      var(--color-gray-300);
+    --color-border-interactive: var(--color-gray-600);  /* 6.19:1 — ≥ 3:1     */
+    --color-border-strong:      var(--color-black);
+    --color-border-disabled:    var(--color-gray-600);
+
+    /* Primary action: the state matrix for the button, expressed as data.
+       Every state differs from its neighbours by more than colour alone
+       (see components.css for the accompanying non-colour cues). */
+    --color-action-bg:          var(--color-black);
+    --color-action-bg-hover:    var(--color-gray-700);  /* white text  8.86:1  */
+    --color-action-bg-active:   var(--color-gray-900);  /* white text 17.40:1  */
+    --color-action-text:        var(--color-text-inverse);
+    --color-action-border:      var(--color-black);
+
+    /* Focus: black ring with a white halo (see section 4). */
+    --color-focus-ring: var(--color-black);
+    --color-focus-halo: var(--color-white);
+
+    /* Feedback: in a monochrome system, error is communicated through
+       stroke weight, an explicit text prefix, and programmatic state
+       (aria-invalid) — never hue. This satisfies WCAG 1.4.1 (Use of Colour)
+       by construction, since there is no hue to rely on. */
+    --color-feedback-error: var(--color-black);
+
+
+    /* ======================================================================
+       9. MOTION
+       ----------------------------------------------------------------------
+       State transitions are short and purely confirmatory. Durations are
+       zeroed globally under prefers-reduced-motion (see components.css).
+       ====================================================================== */
+    --duration-instant: 0ms;
+    --duration-fast:    120ms;
+    --easing-standard:  cubic-bezier(0.2, 0, 0, 1);
+  }
+}

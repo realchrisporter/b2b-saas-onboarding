@@ -1,0 +1,645 @@
+/* ==========================================================================
+   components.css
+   --------------------------------------------------------------------------
+   Structural CSS for the component library.
+
+   Depends on: tokens.css (must be loaded first; it declares layer order).
+
+   AUTHORING CONTRACT
+   - Values: tokens only. No colour or spacing literal appears in this file.
+     Permitted exceptions, each structural rather than stylistic:
+       · `0`, `100%`, `none`, `auto`
+       · accessibility-utility internals (1px clip box, off-screen offset)
+       · @media / @container breakpoints — custom properties cannot be
+         evaluated inside query conditions, so these are literal rem values
+         that correspond to grid multiples (24rem = 48 units, 48rem = 96).
+   - Naming: flat BEM with a namespace prefix.
+       .c-*   component       (.c-button, .c-input, .c-card)
+       .c-*__ element         (.c-card__title)
+       .l-*   layout primitive (.l-stack, .l-container)
+     The prefix tells a reader what a class is allowed to do: a .c-* class
+     owns its internal box model; an .l-* class only arranges children.
+   - Selectors: single class + pseudo-class/attribute. No descendant
+     chains, no IDs, no element-qualified classes. Flat specificity means
+     source order inside a layer is the only tiebreaker.
+   - State: expressed through native pseudo-classes and ARIA attributes,
+     never through modifier classes like .is-active. The DOM's actual
+     accessibility state and its visual state cannot drift apart.
+
+   CONTENTS
+     1. Base layer         — reset, document defaults, utilities
+     2. Button             — .c-button
+     3. Field / Input      — .c-field, .c-input
+     4. Card               — .c-card
+     5. Layout layer       — .l-container, .l-stack, .l-cluster
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. BASE
+   Minimal, opinionated reset. Only what is required to make the grid and
+   type scale behave predictably. Nothing decorative.
+   ========================================================================== */
+@layer base {
+
+  /* Border-box everywhere: a declared dimension is the rendered dimension.
+     This is what allows --size-control (48px) to remain 48px regardless of
+     border width, keeping every control on the 8-point grid. */
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    /* Prevent iOS from inflating text in landscape; the fluid scale in
+       tokens.css already handles viewport adaptation. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-surface-page);
+    color: var(--color-text-primary);
+    font-family: var(--font-body);
+    font-size: var(--font-size-0);
+    line-height: var(--line-height-body);
+    /* Native form controls and scrollbars render in light scheme,
+       matching the token palette. */
+    color-scheme: light;
+  }
+
+  /* Remove UA margins. Vertical rhythm is owned exclusively by layout
+     primitives (.l-stack) via `gap`, so no element carries its own outer
+     margin. This eliminates margin-collapse ambiguity. */
+  h1, h2, h3, h4, p, ul, ol, dl, dd, figure {
+    margin: 0;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-heading);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-tight);
+    letter-spacing: var(--letter-spacing-heading);
+    /* Balanced wrapping prevents single-word orphans on headings. */
+    text-wrap: balance;
+  }
+
+  h1 { font-size: var(--font-size-4); }
+  h2 { font-size: var(--font-size-3); }
+  h3 { font-size: var(--font-size-2); }
+
+  p {
+    max-inline-size: var(--size-measure);
+    text-wrap: pretty;
+  }
+
+  /* Form controls do not inherit typography by default in most browsers. */
+  button, input, select, textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* Global focus fallback for any focusable element that is not a styled
+     component (e.g. links in running text). Components restate this
+     explicitly so each is self-documenting. */
+  :focus-visible {
+    outline: var(--focus-ring-width) solid var(--color-focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  /* Remove focus ring for mouse/touch focus only; :focus-visible above
+     still shows it for keyboard focus. */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Programmatic focus targets (e.g. <main tabindex="-1"> reached via the
+     skip link) are not interactive; ringing the entire region is noise. */
+  [tabindex="-1"]:focus {
+    outline: none;
+  }
+
+  /* Honour user motion preferences globally (WCAG 2.3.3). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: var(--duration-instant) !important;
+      animation-duration: var(--duration-instant) !important;
+    }
+  }
+
+  /* Utility: hide visually, keep in the accessibility tree.
+     Used for labels that are redundant visually but required for
+     screen-reader context. */
+  .u-visually-hidden {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Skip link (WCAG 2.4.1 Bypass Blocks). Off-screen until focused, then
+     it becomes the first visible element on the page. */
+  .u-skip-link {
+    position: absolute;
+    inset-block-start: var(--space-1);
+    inset-inline-start: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    background-color: var(--color-action-bg);
+    color: var(--color-action-text);
+    font-family: var(--font-ui);
+    font-weight: var(--font-weight-semibold);
+    transform: translateY(-200%);
+  }
+
+  .u-skip-link:focus-visible {
+    transform: none;
+  }
+}
+
+
+@layer components {
+
+  /* ========================================================================
+     2. BUTTON — .c-button
+     ------------------------------------------------------------------------
+     Primary action. One per view region is the intended usage; the solid
+     black fill is the highest-emphasis treatment in the system and loses
+     meaning if repeated.
+
+     Markup:
+       <button class="c-button" type="button">Label</button>
+
+     Use <button>, not <a>, for actions. Use <a class="c-button"> only when
+     the control navigates. The CSS supports both; the semantics do not.
+
+     STATE MATRIX
+     ┌──────────────┬───────────────┬──────────────────────────────────────┐
+     │ State        │ Fill          │ Non-colour cue                       │
+     ├──────────────┼───────────────┼──────────────────────────────────────┤
+     │ Rest         │ black         │ —                                    │
+     │ Hover        │ gray-700      │ label underline appears              │
+     │ Active       │ gray-900      │ inset stroke (reads as "pressed")    │
+     │ Focus-visible│ (unchanged)   │ 2px ring + halo outside the box      │
+     │ Disabled     │ gray-100      │ dashed border, no pointer            │
+     └──────────────┴───────────────┴──────────────────────────────────────┘
+     Every state is identifiable without perceiving the fill change,
+     satisfying WCAG 1.4.1 (Use of Colour).
+     States are orthogonal: focus-visible composes with hover or active
+     because it uses outline/box-shadow, which no other state touches.
+     ======================================================================== */
+
+  .c-button {
+    /* --- Box model ------------------------------------------------------ */
+    /* inline-flex: shrink-wraps to content like inline text, but centres
+       label and optional icon on both axes without line-height hacks. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);                    /* label ↔ icon: 8px            */
+
+    /* min-block-size, not block-size: a long label may wrap at narrow
+       widths or large zoom levels, and the button must grow rather than
+       clip (WCAG 1.4.10 Reflow). */
+    min-block-size: var(--size-control);    /* 48px                         */
+    padding-block: var(--space-1);          /*  8px — only engages on wrap  */
+    padding-inline: var(--space-3);         /* 24px                         */
+
+    border: var(--border-width-thick) solid var(--color-action-border);
+    border-radius: var(--radius-none);
+
+    /* --- Typography ----------------------------------------------------- */
+    font-family: var(--font-ui);
+    font-size: var(--font-size-0);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-snug);
+    text-align: center;
+    text-decoration: none;                  /* normalises <a class=c-button> */
+
+    /* --- Colour --------------------------------------------------------- */
+    background-color: var(--color-action-bg);
+    color: var(--color-action-text);
+
+    /* --- Behaviour ------------------------------------------------------ */
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    /* Removes the 300ms double-tap-to-zoom delay on touch devices. */
+    touch-action: manipulation;
+    transition:
+      background-color var(--duration-fast) var(--easing-standard),
+      box-shadow       var(--duration-fast) var(--easing-standard);
+  }
+
+  /* Hover — gated behind (hover: hover) so touch devices, which emulate
+     hover on tap, do not get a "stuck" hover state after release.
+     :not() guards ensure a disabled button never shows an enabled cue. */
+  @media (hover: hover) {
+    .c-button:hover:not(:disabled, [aria-disabled="true"]) {
+      background-color: var(--color-action-bg-hover);
+      text-decoration: underline;
+      text-decoration-thickness: var(--border-width-thick);
+      text-underline-offset: var(--underline-offset);
+    }
+  }
+
+  /* Active — the pressed state. The inset stroke visually reduces the
+     button's inner area, conveying depression without moving the element
+     (transforms on press cause layout-adjacent jitter and are avoided). */
+  .c-button:active:not(:disabled, [aria-disabled="true"]) {
+    background-color: var(--color-action-bg-active);
+    box-shadow: inset 0 0 0 var(--border-width-thick) var(--color-text-inverse);
+  }
+
+  /* Focus-visible — keyboard focus only. Outline sits outside the border;
+     the box-shadow halo fills the offset gap in white so the ring holds
+     contrast on any surface. Applies to disabled-via-ARIA buttons too,
+     because they remain focusable by design. */
+  .c-button:focus-visible {
+    outline: var(--focus-ring-width) solid var(--color-focus-ring);
+    outline-offset: var(--focus-ring-offset);
+    box-shadow: 0 0 0 var(--focus-ring-offset) var(--color-focus-halo);
+  }
+
+  /* Active + focus-visible together: preserve both indicators. */
+  .c-button:active:focus-visible:not(:disabled, [aria-disabled="true"]) {
+    box-shadow:
+      inset 0 0 0 var(--border-width-thick) var(--color-text-inverse),
+      0 0 0 var(--focus-ring-offset) var(--color-focus-halo);
+  }
+
+  /* Disabled — two supported mechanisms:
+     1. [disabled]            removes the control from tab order entirely.
+     2. [aria-disabled=true]  keeps it focusable so screen-reader users can
+                              discover the action exists and why it is
+                              unavailable (pair with aria-describedby).
+                              Requires JS to block activation. */
+  .c-button:disabled,
+  .c-button[aria-disabled="true"] {
+    background-color: var(--color-surface-disabled);
+    border-style: dashed;
+    border-color: var(--color-border-disabled);
+    color: var(--color-text-disabled);
+    cursor: not-allowed;
+  }
+
+
+  /* ========================================================================
+     3. FIELD & TEXT INPUT — .c-field, .c-input
+     ------------------------------------------------------------------------
+     A field is the complete unit of information: label, optional hint,
+     control, and optional error message. The input is never used alone.
+
+     Markup (DOM order = visual order = screen-reader order):
+       <div class="c-field">
+         <label class="c-field__label" for="id">Label</label>
+         <p class="c-field__hint" id="id-hint">Hint</p>
+         <input class="c-input" id="id" aria-describedby="id-hint">
+         <p class="c-field__error" id="id-error">Message</p>
+       </div>
+
+     WHY THE HINT PRECEDES THE INPUT: users (and screen readers in browse
+     mode) encounter formatting requirements before typing, not after.
+
+     WHY PLACEHOLDER IS NOT A LABEL: placeholder text disappears on input,
+     is not reliably announced, and is frequently mistaken for a pre-filled
+     value. It is used here only for an example format.
+     ======================================================================== */
+
+  .c-field {
+    /* Grid with a single column: children stack, and `gap` provides the
+       only vertical spacing. No child carries margin. */
+    display: grid;
+    gap: var(--space-1);                    /* 8px between label/hint/input */
+    max-inline-size: var(--size-container);
+  }
+
+  .c-field__label {
+    font-family: var(--font-ui);
+    font-size: var(--font-size-0);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-snug);
+    color: var(--color-text-primary);
+  }
+
+  .c-field__hint {
+    font-family: var(--font-ui);
+    font-size: var(--font-size--1);
+    line-height: var(--line-height-body);
+    color: var(--color-text-secondary);
+  }
+
+  /* Error message. Structure over colour: bold weight plus a literal
+     "Error:" prefix (supplied in markup, so it is read aloud and survives
+     copy/paste and forced-colours mode). */
+  .c-field__error {
+    font-family: var(--font-ui);
+    font-size: var(--font-size--1);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-body);
+    color: var(--color-feedback-error);
+  }
+
+  .c-input {
+    /* --- Box model ------------------------------------------------------ */
+    /* block + 100% inline-size: the input fills its field column. Width is
+       controlled by the container (.c-field), never by the input itself. */
+    display: block;
+    inline-size: 100%;
+
+    /* Fixed block-size, identical to the button. With border-box, the
+       1px border is inside the 48px, so the outer edge stays on-grid. */
+    block-size: var(--size-control);        /* 48px                         */
+    padding-block: 0;                       /* text centred by block-size   */
+    padding-inline: var(--space-2);         /* 16px                         */
+
+    border: var(--border-width-thin) solid var(--color-border-interactive);
+    border-radius: var(--radius-none);
+
+    /* --- Typography ----------------------------------------------------- */
+    font-family: var(--font-ui);
+    /* --font-size-0 has a floor of 1rem (16px). iOS Safari auto-zooms any
+       input under 16px on focus; the token's clamp() minimum prevents it. */
+    font-size: var(--font-size-0);
+    line-height: var(--line-height-snug);
+
+    /* --- Colour --------------------------------------------------------- */
+    background-color: var(--color-surface-raised);
+    color: var(--color-text-primary);
+
+    /* --- Behaviour ------------------------------------------------------ */
+    /* Strip platform styling (inner shadows, rounded corners on iOS) so
+       the rendered control matches the token spec on every engine. */
+    appearance: none;
+    transition:
+      border-color var(--duration-fast) var(--easing-standard),
+      box-shadow   var(--duration-fast) var(--easing-standard);
+  }
+
+  .c-input::placeholder {
+    color: var(--color-text-placeholder);
+    /* Firefox applies a default opacity < 1 to placeholders, which would
+       silently push contrast below the documented 6.19:1. */
+    opacity: 1;
+  }
+
+  /* Hover: boundary darkens to full black. */
+  @media (hover: hover) {
+    .c-input:hover:not(:disabled, :focus) {
+      border-color: var(--color-border-strong);
+    }
+  }
+
+  /* Focus-visible: text inputs match :focus-visible on ANY focus (mouse
+     or keyboard) in all major browsers, because the user must always know
+     where typed characters will land. Two cues: border goes black, and the
+     shared external ring appears. */
+  .c-input:focus-visible {
+    border-color: var(--color-border-strong);
+    outline: var(--focus-ring-width) solid var(--color-focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  /* Invalid: driven by aria-invalid (set by application logic after
+     validation), NOT by :invalid, which fires before the user has typed
+     anything and produces premature error styling.
+     An inset shadow doubles the stroke weight without changing the box's
+     content area, so the entered text does not shift by 1px. */
+  .c-input[aria-invalid="true"] {
+    border-color: var(--color-feedback-error);
+    box-shadow: inset 0 0 0 var(--border-width-thin) var(--color-feedback-error);
+  }
+
+  .c-input:disabled {
+    background-color: var(--color-surface-disabled);
+    border-style: dashed;
+    border-color: var(--color-border-disabled);
+    color: var(--color-text-disabled);
+    cursor: not-allowed;
+  }
+
+  /* Label of a disabled field reflects the state. :has() lets the parent
+     read the child's native state, so no extra class is needed. */
+  .c-field:has(.c-input:disabled) .c-field__label {
+    color: var(--color-text-disabled);
+  }
+
+
+  /* ========================================================================
+     4. CARD — .c-card
+     ------------------------------------------------------------------------
+     A bounded container for a single, self-contained unit of content:
+     metadata, title, description, and one primary action.
+
+     Markup:
+       <article class="c-card" aria-labelledby="card-title-id">
+         <header class="c-card__header">
+           <p class="c-card__meta">Meta</p>
+           <h3 class="c-card__title" id="card-title-id">Title</h3>
+         </header>
+         <p class="c-card__body">Description</p>
+         <footer class="c-card__actions">
+           <button class="c-button" type="button">Action</button>
+         </footer>
+       </article>
+
+     ELEMENT CHOICE: <article> because the card's content is independently
+     meaningful if lifted out of the page. Use <section> or <div> when it is
+     not. aria-labelledby gives the landmark an accessible name from its
+     own heading.
+
+     LAYOUT MODEL: three-row grid — [header] [body] [actions].
+       grid-template-rows: auto 1fr auto
+     The body row absorbs all spare height. When cards sit side by side in
+     a stretched row, their action rows align along a common bottom edge
+     regardless of description length. This is the structural reason for
+     grid over a simple flex column.
+     ======================================================================== */
+
+  .c-card {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: var(--space-2);                    /* 16px between rows            */
+
+    /* Establishes a container-query context so internal layout can adapt
+       to the card's own width rather than the viewport's. */
+    container-type: inline-size;
+
+    padding: var(--space-4);                /* 32px                         */
+    border: var(--border-width-thin) solid var(--color-border-subtle);
+    border-radius: var(--radius-none);
+    background-color: var(--color-surface-raised);
+    max-inline-size: var(--size-container);
+  }
+
+  /* Header groups meta + title as a single unit with a tighter internal
+     gap (8px) than the card's row gap (16px). Proximity communicates that
+     the meta line describes the title, not the body. */
+  .c-card__header {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .c-card__meta {
+    font-family: var(--font-meta);
+    font-size: var(--font-size--1);
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-body);
+    letter-spacing: var(--letter-spacing-meta);
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+  }
+
+  .c-card__title {
+    font-family: var(--font-heading);
+    font-size: var(--font-size-2);
+  }
+
+  .c-card__body {
+    font-family: var(--font-body);
+    font-size: var(--font-size-0);
+    line-height: var(--line-height-body);
+    color: var(--color-text-secondary);
+  }
+
+  /* Actions row: flex-wrap so multiple actions reflow onto new lines at
+     narrow widths rather than overflowing. padding-block-start adds one
+     unit (8px) on top of the 16px row gap, giving 24px total separation —
+     the action is visually detached from content it acts upon. */
+  .c-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    padding-block-start: var(--space-1);
+  }
+
+  /* Narrow card (e.g. in a 3-column grid or on a small phone): the
+     primary action expands to full width so the touch target spans the
+     card and the label never truncates. Keyed to the card's width, not
+     the viewport, so the card behaves correctly in any parent layout. */
+  @container (max-width: 24rem) {
+    .c-card__actions > .c-button {
+      flex: 1 1 100%;
+    }
+  }
+
+
+  /* ========================================================================
+     FORCED COLOURS (Windows High Contrast Mode)
+     ------------------------------------------------------------------------
+     The OS replaces all author colours. Backgrounds and box-shadows are
+     dropped, so any state conveyed only by fill or shadow would vanish.
+     These rules restore structural cues using system colour keywords.
+     ======================================================================== */
+  @media (forced-colors: active) {
+    .c-button {
+      border-color: ButtonText;
+    }
+
+    .c-button:disabled,
+    .c-button[aria-disabled="true"] {
+      border-color: GrayText;
+      color: GrayText;
+    }
+
+    .c-button:focus-visible,
+    .c-input:focus-visible {
+      outline-color: Highlight;
+    }
+
+    /* The inset box-shadow used for the invalid state is removed in forced
+       colours; a thicker real border replaces it. */
+    .c-input[aria-invalid="true"] {
+      border-width: var(--border-width-thick);
+    }
+  }
+}
+
+
+/* ==========================================================================
+   5. LAYOUT PRIMITIVES
+   Page composition only. These classes arrange children and never style
+   them. Components never set their own outer margin; the parent layout
+   decides spacing between siblings.
+   ========================================================================== */
+@layer layout {
+
+  /* Centred content column with responsive side gutters.
+     Gutter is 16px on small screens, 32px from 48rem (768px) up. */
+  .l-container {
+    inline-size: 100%;
+    max-inline-size: calc(var(--size-container) + var(--space-4) * 2);
+    margin-inline: auto;
+    padding-inline: var(--space-2);
+  }
+
+  @media (min-width: 48rem) {
+    .l-container {
+      padding-inline: var(--space-4);
+    }
+  }
+
+  /* Vertical stack. The gap is set per instance via --stack-gap so one
+     primitive covers every rhythm on the page. Defaults to 16px. */
+  .l-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--stack-gap, var(--space-2));
+  }
+
+  /* Allow stacked children to size to content instead of stretching. */
+  .l-stack > .c-button {
+    align-self: flex-start;
+  }
+
+  /* Horizontal group that wraps. Used for sets of peer controls. */
+  .l-cluster {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cluster-gap, var(--space-2));
+  }
+
+  /* Page regions */
+  .l-page-header {
+    padding-block: var(--space-8) var(--space-6);
+    border-block-end: var(--border-width-thin) solid var(--color-border-subtle);
+  }
+
+  .l-page-main {
+    padding-block: var(--space-8);
+  }
+
+  .l-page-footer {
+    padding-block: var(--space-6);
+    border-block-start: var(--border-width-thin) solid var(--color-border-subtle);
+  }
+
+  /* Section heading block: mono index + heading + description.
+     Deliberately NOT uppercased (unlike .c-card__meta): this line carries
+     class and file names, which are case-sensitive identifiers. */
+  .l-section-meta {
+    font-family: var(--font-meta);
+    font-size: var(--font-size--1);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: var(--letter-spacing-meta);
+    color: var(--color-text-secondary);
+  }
+
+  /* Specimen frame: marks the boundary between documentation and the live
+     component. The dashed stroke reads as a "drawing boundary", not as
+     part of the component under inspection. */
+  .l-specimen {
+    padding: var(--space-4);
+    border: var(--border-width-thin) dashed var(--color-border-subtle);
+  }
+}

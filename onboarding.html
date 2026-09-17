@@ -1,0 +1,183 @@
+<!doctype html>
+<!--
+  onboarding.html — 3-step workspace onboarding
+  ============================================================================
+  Built entirely from tokens.css + components.css. No page-level CSS.
+
+  STRUCTURE
+    main > .l-container
+      h1 (visually hidden)                  ← page outline anchor
+      section[data-step] × 3                ← one visible at a time via [hidden]
+        .c-card                             ← form for steps 1–2, div for 3
+          header.c-card__header             ← meta (progress) + h2 title
+          div.l-stack                       ← body copy + fields
+          footer.c-card__actions            ← single primary action
+
+  WHY [hidden] SITS ON THE <section>, NOT THE CARD
+  .c-card declares `display: grid` in the components layer, which overrides
+  the UA `[hidden] { display: none }` rule. The unstyled wrapper keeps the
+  native attribute working with zero new CSS.
+
+  FOCUS MANAGEMENT
+  Each h2 carries tabindex="-1". app.js moves focus to it on step change so
+  screen readers announce the new step. The base layer suppresses the ring
+  on [tabindex="-1"]:focus.
+  ============================================================================
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Step 1 of 3: Create your workspace</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap">
+
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+
+  <script src="app.js" defer></script>
+</head>
+
+<body>
+
+  <main class="l-page-main">
+    <div class="l-container">
+
+      <h1 class="u-visually-hidden">Set up your workspace</h1>
+
+      <!-- Polite live region: announces transient loading state, which a
+           text change on a focused button does not reliably convey. -->
+      <p class="u-visually-hidden" role="status" data-status></p>
+
+
+      <!-- ================================================================
+           STEP 1 — Create workspace
+           ================================================================ -->
+      <section data-step aria-labelledby="step-workspace-title">
+        <form class="c-card" novalidate>
+          <header class="c-card__header">
+            <p class="c-card__meta">Step 1 of 3</p>
+            <h2 class="c-card__title" id="step-workspace-title" tabindex="-1">Create your workspace</h2>
+          </header>
+
+          <div class="l-stack" style="--stack-gap: var(--space-3)">
+            <p class="c-card__body">
+              A workspace is where your team’s projects, members, and billing live.
+            </p>
+
+            <div class="c-field">
+              <label class="c-field__label" for="workspace-name">Workspace name</label>
+              <p class="c-field__hint" id="workspace-name-hint">
+                Usually your company or team name. You can change it later.
+              </p>
+              <input
+                class="c-input"
+                id="workspace-name"
+                name="workspaceName"
+                type="text"
+                autocomplete="organization"
+                placeholder="Acme Inc."
+                required
+                aria-describedby="workspace-name-hint">
+              <p class="c-field__error" id="workspace-name-error" hidden>
+                Error: Enter a workspace name.
+              </p>
+            </div>
+          </div>
+
+          <footer class="c-card__actions">
+            <button class="c-button" type="submit">Continue</button>
+          </footer>
+        </form>
+      </section>
+
+
+      <!-- ================================================================
+           STEP 2 — Invite team
+           Both fields optional; format is validated only when filled.
+           autocomplete="off": these are other people's addresses, so
+           autofilling the user's own email would be wrong (1.3.5 scope).
+           ================================================================ -->
+      <section data-step aria-labelledby="step-invite-title" hidden>
+        <form class="c-card" novalidate>
+          <header class="c-card__header">
+            <p class="c-card__meta">Step 2 of 3</p>
+            <h2 class="c-card__title" id="step-invite-title" tabindex="-1">Invite your team</h2>
+          </header>
+
+          <div class="l-stack" style="--stack-gap: var(--space-3)">
+            <p class="c-card__body">
+              Add up to two teammates now. You can skip this and invite more from Settings later.
+            </p>
+
+            <div class="c-field">
+              <label class="c-field__label" for="invite-email-1">First teammate’s email (optional)</label>
+              <input
+                class="c-input"
+                id="invite-email-1"
+                name="inviteEmail"
+                type="email"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="name@company.com">
+              <p class="c-field__error" id="invite-email-1-error" hidden>
+                Error: Enter an email address in the format name@company.com.
+              </p>
+            </div>
+
+            <div class="c-field">
+              <label class="c-field__label" for="invite-email-2">Second teammate’s email (optional)</label>
+              <input
+                class="c-input"
+                id="invite-email-2"
+                name="inviteEmail"
+                type="email"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="name@company.com">
+              <p class="c-field__error" id="invite-email-2-error" hidden>
+                Error: Enter an email address in the format name@company.com.
+              </p>
+            </div>
+          </div>
+
+          <footer class="c-card__actions">
+            <button class="c-button" type="submit">Continue</button>
+          </footer>
+        </form>
+      </section>
+
+
+      <!-- ================================================================
+           STEP 3 — Success
+           <a class="c-button">: this action navigates, so it is a link.
+           ================================================================ -->
+      <section data-step aria-labelledby="step-success-title" hidden>
+        <div class="c-card">
+          <header class="c-card__header">
+            <p class="c-card__meta">Step 3 of 3</p>
+            <h2 class="c-card__title" id="step-success-title" tabindex="-1">You’re all set</h2>
+          </header>
+
+          <div class="l-stack" style="--stack-gap: var(--space-1)">
+            <p class="c-card__body">
+              <strong data-workspace-name>Your workspace</strong> is ready.
+            </p>
+            <p class="c-card__body" data-invite-summary>
+              You can invite teammates any time from Settings.
+            </p>
+          </div>
+
+          <footer class="c-card__actions">
+            <a class="c-button" href="/dashboard">Enter Dashboard</a>
+          </footer>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+</body>
+</html>
